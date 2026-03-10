@@ -1,15 +1,38 @@
 from fastapi import APIRouter, Depends, HTTPException
 from database.models import Usuario
 from routes.dependeces import pegar_sessao
-from main import bcrypt_context
+from main import bcrypt_context, ALGORITHM, ACESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
 from schemas import UsuarioSchema, LoginSchema
 from sqlalchemy.orm import Session
+from jose import jwt, JWTError
+from datetime import datetime, timedelta, timezone
 
 auth_routes = APIRouter(prefix="/auth", tags=["auth"])
 
-def criar_token(id_usuario):
-    token = f"asudihiuashd2q18737812yuisad{id_usuario}"
-    return token
+def criar_token(id_usuario, duracao_token=timedelta(minutes = ACESS_TOKEN_EXPIRE_MINUTES)):
+    #JWT
+    data_expiracao = datetime.now(timezone.utc) + duracao_token
+    dic_info = {
+        "sub": id_usuario,
+        "data_de_expiracao": data_expiracao.timestamp()
+    }
+    jwt_codificado = jwt.encode(dic_info, SECRET_KEY, ALGORITHM)
+    return jwt_codificado
+
+def verificar_token(token, session: Session = Depends(pegar_sessao)):
+    # verificar se o token é valido
+    # extrair o ID do usuario do token 
+    usuario = session.query(Usuario).filter(Usuario.id == 1).firts()
+    return usuario
+
+
+def autenticar_usuario(email, senha, session):
+    usuario = session.query(Usuario).filter(Usuario.email == email).first()
+    if not usuario:
+        return False
+    elif not bcrypt_context.verify(senha, usuario.senha):
+        return False
+    return usuario
 
 @auth_routes.get("/")
 async def home():
@@ -33,14 +56,26 @@ async def criar_conta(usuario_schema: UsuarioSchema, session: Session = Depends(
 @auth_routes.post("/login")
 async def login(login_schema: LoginSchema, session: Session = Depends(pegar_sessao)):
     usuario = session.query(Usuario).filter(Usuario.email == login_schema.email).first()
+    usuario = autenticar_usuario(login_schema.email, login_schema.senha, session)
     if not usuario:
-        raise HTTPException(status_code = 400, detail="Esse usuario não existe")
+        raise HTTPException(status_code = 400, detail="Esse usuario não existe ou credenciais invalidas.")
     else:
         acess_token = criar_token(usuario.id)
+        refresh_token = criar_token(usuario.id, duracao_token=timedelta(days=7))
         return {
             "acess_token": acess_token,
+            "refresh_token": refresh_token,
             "token_type": "Bearer"
             }
     
-    
+
+@auth_routes.get("/refresh")
+async def use_refresh_token(token):
+    #verificar o token
+    usuario = verificar_token(token)
+    acess_token = criar_token(usuario.id)
+    return {
+            "acess_token": acess_token,
+            "token_type": "Bearer"
+            }
     
