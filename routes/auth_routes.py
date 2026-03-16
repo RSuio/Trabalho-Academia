@@ -9,21 +9,31 @@ from datetime import datetime, timedelta, timezone
 
 auth_routes = APIRouter(prefix="/auth", tags=["auth"])
 
-def criar_token(id_usuario, duracao_token=timedelta(minutes = ACESS_TOKEN_EXPIRE_MINUTES)):
-    #JWT
-    data_expiracao = datetime.now(timezone.utc) + duracao_token
-    dic_info = {
-        "sub": id_usuario,
-        "data_de_expiracao": data_expiracao.timestamp()
+def criar_token(id_usuario: int):
+    # coloquei agora o token com 24 horas de duração.
+    tempo_expiracao = datetime.now(timezone.utc) + timedelta(hours=24)
+    
+    payload = {
+        "sub": str(id_usuario),
+        "exp": tempo_expiracao
     }
-    jwt_codificado = jwt.encode(dic_info, SECRET_KEY, ALGORITHM)
-    return jwt_codificado
+    
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-def verificar_token(token, session: Session = Depends(pegar_sessao)):
-    # verificar se o token é valido
-    # extrair o ID do usuario do token 
-    usuario = session.query(Usuario).filter(Usuario.id == 1).firts()
-    return usuario
+def verificar_token(token: str, session: Session):
+    try:
+        # Decodifica o token. Se o tempo exp já passou, ele lança JWTError
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        id_usuario: str = payload.get("sub")
+        if id_usuario is None:
+            raise HTTPException(status_code=401, detail="Token inválido.")
+        usuario = session.query(Usuario).filter(Usuario.id == int(id_usuario)).first()
+        if usuario is None:
+            raise HTTPException(status_code=401, detail="Usuário não encontrado.")
+        return usuario
+    except JWTError:
+        # Se o token expirou ou é incorreto, vem pra ca
+        raise HTTPException(status_code=401, detail="Sessão expirada. Por favor, faça login novamente.")
 
 
 def autenticar_usuario(email, senha, session):
@@ -58,15 +68,14 @@ async def login(login_schema: LoginSchema, session: Session = Depends(pegar_sess
     usuario = session.query(Usuario).filter(Usuario.email == login_schema.email).first()
     usuario = autenticar_usuario(login_schema.email, login_schema.senha, session)
     if not usuario:
-        raise HTTPException(status_code = 400, detail="Esse usuario não existe ou credenciais invalidas.")
-    else:
-        acess_token = criar_token(usuario.id)
-        refresh_token = criar_token(usuario.id, duracao_token=timedelta(days=7))
-        return {
-            "acess_token": acess_token,
-            "refresh_token": refresh_token,
-            "token_type": "Bearer"
-            }
+        raise HTTPException(status_code = 401, detail="Esse usuario não existe ou credenciais invalidas.")
+    # apenas um token com validade de 24h
+    access_token = criar_token(usuario.id)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": 86400 
+    }
     
 
 @auth_routes.get("/refresh")
