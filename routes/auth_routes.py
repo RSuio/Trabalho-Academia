@@ -76,15 +76,3 @@ async def login(login_schema: LoginSchema, session: Session = Depends(pegar_sess
         "token_type": "bearer",
         "expires_in": 86400 
     }
-    
-
-@auth_routes.get("/refresh")
-async def use_refresh_token(token):
-    #verificar o token
-    usuario = verificar_token(token)
-    acess_token = criar_token(usuario.id)
-    return {
-            "acess_token": acess_token,
-            "token_type": "Bearer"
-            }
-    
