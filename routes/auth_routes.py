@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from database.models import Usuario
 from routes.dependeces import pegar_sessao
-from main import bcrypt_context, ALGORITHM, ACESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
+from main import bcrypt_context, ALGORITHM, ACESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, oauth2_schema
 from schemas import UsuarioSchema, LoginSchema
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
+from fastapi.security import OAuth2PasswordRequestForm
 
 auth_routes = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -20,7 +21,7 @@ def criar_token(id_usuario: int):
     
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-def verificar_token(token: str, session: Session):
+def verificar_token(token: str = Depends(oauth2_schema), session: Session = Depends(pegar_sessao)):
     try:
         # Decodifica o token. Se o tempo exp já passou, ele lança JWTError
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -75,4 +76,16 @@ async def login(login_schema: LoginSchema, session: Session = Depends(pegar_sess
         "access_token": access_token,
         "token_type": "bearer",
         "expires_in": 86400 
+    }
+
+@auth_routes.post("/login-form")
+async def login_form(dados_formulario: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(pegar_sessao)):
+    usuario = autenticar_usuario(dados_formulario.username, dados_formulario.password, session)
+    if not usuario:
+        raise HTTPException(status_code = 401, detail="Esse usuario não existe ou credenciais invalidas.")
+    # apenas um token com validade de 24h
+    access_token = criar_token(usuario.id)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
     }
