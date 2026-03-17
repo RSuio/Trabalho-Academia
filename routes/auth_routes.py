@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from database.models import Usuario
 from routes.dependeces import pegar_sessao
 from main import bcrypt_context, ALGORITHM, ACESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, oauth2_schema
@@ -30,11 +30,11 @@ def verificar_token(token: str = Depends(oauth2_schema), session: Session = Depe
             raise HTTPException(status_code=401, detail="Token inválido.")
         usuario = session.query(Usuario).filter(Usuario.id == int(id_usuario)).first()
         if usuario is None:
-            raise HTTPException(status_code=401, detail="Usuário não encontrado.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
         return usuario
     except JWTError:
         # Se o token expirou ou é incorreto, vem pra ca
-        raise HTTPException(status_code=401, detail="Sessão expirada. Por favor, faça login novamente.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessão expirada. Por favor, faça login novamente.")
 
 
 def autenticar_usuario(email, senha, session):
@@ -53,8 +53,7 @@ async def home():
 async def criar_conta(usuario_schema: UsuarioSchema, session: Session = Depends(pegar_sessao)):
     usuario = session.query(Usuario).filter(Usuario.email == usuario_schema.email).first()
     if usuario:
-        raise HTTPException(status_code = 400, detail="E-mail do usuário já cadastrado")
-        # Já existe um usuario com esse email
+        raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST, detail="E-mail do usuário já cadastrado")
     else:
         senha_criptografada = bcrypt_context.hash(usuario_schema.senha)
         novo_usuario = Usuario(usuario_schema.nome,usuario_schema.email,senha_criptografada, usuario_schema.admin, usuario_schema.ativo)
