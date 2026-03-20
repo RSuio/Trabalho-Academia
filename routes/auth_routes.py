@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from database.models import Usuario
 from routes.dependeces import pegar_sessao
-from main import bcrypt_context, ALGORITHM, ACESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY, oauth2_schema
+from main import bcrypt_context, ALGORITHM, SECRET_KEY, oauth2_schema
 from schemas import UsuarioSchema, LoginSchema
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
