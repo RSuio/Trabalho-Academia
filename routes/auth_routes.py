@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from database.models import Usuario
-from routes.dependeces import pegar_sessao
+from routes.dependeces import pegar_sessao, verificar_token
 from main import bcrypt_context, ALGORITHM, SECRET_KEY, oauth2_schema
 from schemas import UsuarioSchema, LoginSchema
 from sqlalchemy.orm import Session
@@ -20,22 +20,6 @@ def criar_token(id_usuario: int):
     }
     
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-def verificar_token(token: str = Depends(oauth2_schema), session: Session = Depends(pegar_sessao)):
-    try:
-        # Decodifica o token. Se o tempo exp já passou, ele lança JWTError
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        id_usuario: str = payload.get("sub")
-        if id_usuario is None:
-            raise HTTPException(status_code=401, detail="Token inválido.")
-        usuario = session.query(Usuario).filter(Usuario.id == int(id_usuario)).first()
-        if usuario is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
-        return usuario
-    except JWTError:
-        # Se o token expirou ou é incorreto, vem pra ca
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessão expirada. Por favor, faça login novamente.")
-
 
 def autenticar_usuario(email, senha, session):
     usuario = session.query(Usuario).filter(Usuario.email == email).first()

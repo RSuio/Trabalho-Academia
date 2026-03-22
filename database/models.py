@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, ForeignKey
 from sqlalchemy.orm import declarative_base
 from sqlalchemy_utils.types import ChoiceType
+from sqlalchemy.orm import relationship
 
 # cria a conexã do seu banco de dados
 db = create_engine("sqlite:///database/banco.db")
@@ -67,6 +68,38 @@ class ItemPedido(Base):
         self.preco_unitario = preco_unitario
         self.pedido = pedido
         
+
+# Tabela de Treinos (O "Título" do grupo de exercícios)
+class Treino(Base):
+    __tablename__ = "treinos"
+    
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    nome = Column("nome", String) 
+    objetivo = Column("objetivo", String) # Ex: Hipertrofia, Força, Emagrecimento
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    exercicios = relationship("Exercicio", backref="treino", cascade="all, delete-orphan")
+
+    def __init__(self, nome, objetivo, usuario_id):
+        self.nome = nome
+        self.objetivo = objetivo
+        self.usuario_id = usuario_id
+
+class Exercicio(Base):
+    __tablename__ = "exercicios"
+    
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    nome = Column("nome", String)
+    series = Column("series", Integer) 
+    repeticoes = Column("repeticoes", Integer) 
+    carga = Column("carga", Float) 
+    treino_id = Column(Integer, ForeignKey("treinos.id"))
+
+    def __init__(self, nome, series, repeticoes, carga, treino_id):
+        self.nome = nome
+        self.series = series
+        self.repeticoes = repeticoes
+        self.carga = carga
+        self.treino_id = treino_id
 
 
 #executa a criação do banco de dados
